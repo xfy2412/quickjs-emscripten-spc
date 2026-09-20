@@ -251,7 +251,19 @@ export class QuickJSRuntime extends UsingDisposable implements Disposable {
       ctxPtrOut.value.ptr,
     )
 
-    const ctxPtr = ctxPtrOut.value.typedArray[0] as JSContextPointer
+    // The output view was created *before* this call. QTS_ExecutePendingJob runs the jobs, which
+    // may grow the WASM memory; Emscripten then replaces the ArrayBuffer and the old view becomes
+    // detached, so reading it yields `undefined` instead of the pointer. The `ctxPtr === 0` check
+    // below would miss that, `contextMap` would miss as well, and the fallback would create a
+    // brand new engine context that nobody disposes - which trips
+    // assert(list_empty(&rt->gc_obj_list)) in JS_FreeRuntime (an uncatchable WASM abort).
+    // Re-read through a view of the *current* heap instead.
+    // (Upstream #248 addresses this class of bug generally with RefreshableTypedArray.)
+    const ctxPtr = new Int32Array(
+      this.module.HEAPU8.buffer,
+      ctxPtrOut.value.ptr,
+      1,
+    )[0] as JSContextPointer
     ctxPtrOut.dispose()
     if (ctxPtr === 0) {
       // No jobs executed.
