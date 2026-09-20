@@ -1,2 +1,9 @@
 # Don't diff generated .emscripten-module files
 *.emscripten-module.js -diff
+
+# 行尾统一为 LF —— 仓库自己声明，才能盖过 Windows Git 的 system 级 core.autocrlf=true。
+# 为什么必须钉：本仓库的构建要在 Linux/WSL 里执行 shell 脚本（scripts/emcc.sh 由 variants 的
+# Makefile 直接调用），一旦检出成 CRLF，#!/bin/bash 会变成 #!/bin/bash\r，内核找不到这个解释器，
+# 报出来的是 "not found"，完全看不出是行尾问题。
+# 顺带的好处：Windows 与 WSL 两边的 git 对同一份工作树看法一致，不会再有满屏幻影 diff。
+* text=auto eol=lf
