@@ -574,6 +574,7 @@ HostRefId QTS_GetHostRefId(JSValueConst *value) {
  */
 
 JSRuntime *QTS_NewRuntime() {
+  { static int once = 0; if (!once) { once = 1; setvbuf(stdout, NULL, _IONBF, 0); printf("[dbg] stdout unbuffered\n"); fflush(stdout); } }
   return JS_NewRuntime();
 }
 
@@ -605,11 +606,15 @@ JSContext *QTS_NewContext(JSRuntime *rt, IntrinsicsFlags intrinsics) {
 
   if (intrinsics == 0) {
     ctx = JS_NewContext(rt);
+    printf("[host] QTS_NewContext FULL ctx=%p\n", (void *)ctx);
+    printf("[host] QTS_NewContext FULL ctx=%p\n", (void *)ctx);
     if (ctx == NULL) {
       return NULL;
     }
   } else {
     ctx = JS_NewContextRaw(rt);
+    printf("[host] QTS_NewContext RAW  ctx=%p\n", (void *)ctx);
+    printf("[host] QTS_NewContext RAW  ctx=%p\n", (void *)ctx);
     if (ctx == NULL) {
       return NULL;
     }
@@ -823,6 +828,7 @@ MaybeAsync(JSValue *) QTS_ExecutePendingJob(JSRuntime *rt, int maxJobsToExecute,
   JSContext *pctx;
   int status = 1;
   int executed = 0;
+  printf("[job] ENTER executed=0 *lastJobContext=%p\n", (void *)*lastJobContext);
   while (executed != maxJobsToExecute && status == 1) {
     status = JS_ExecutePendingJob(rt, &pctx);
     if (status == -1) {
@@ -833,6 +839,8 @@ MaybeAsync(JSValue *) QTS_ExecutePendingJob(JSRuntime *rt, int maxJobsToExecute,
       executed++;
     }
   }
+  printf("[job] EXIT  executed=%d status=%d pctx=%p *lastJobContext=%p\n", executed, status, (void *)pctx, (void *)*lastJobContext);
+
   IF_DEBUG_RT {
     char msg[LOG_LEN];
     snprintf(msg, LOG_LEN, "QTS_ExecutePendingJob(executed: %d, pctx: %p, lastJobExecuted: %p)", executed, pctx, *lastJobContext);

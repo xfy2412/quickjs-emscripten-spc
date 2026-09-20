@@ -1351,6 +1351,8 @@ static const JSClassExoticMethods js_proxy_exotic_methods;
 static const JSClassExoticMethods js_module_ns_exotic_methods;
 static JSClassID js_class_id_alloc = JS_CLASS_INIT_COUNT;
 
+static JSContext *qts_dbg_dup(JSContext *ctx, const char *tag);
+
 static void js_trigger_gc(JSRuntime *rt, size_t size)
 {
     BOOL force_gc;
@@ -1852,7 +1854,7 @@ int JS_EnqueueJob(JSContext *ctx, JSJobFunc *job_func,
     e = js_malloc(ctx, sizeof(*e) + argc * sizeof(JSValue));
     if (!e)
         return -1;
-    e->realm = JS_DupContext(ctx);
+    e->realm = qts_dbg_dup(ctx, "job");
     e->job_func = job_func;
     e->argc = argc;
     for(i = 0; i < argc; i++) {
@@ -2279,6 +2281,13 @@ static void js_free_modules(JSContext *ctx, JSFreeModuleEnum flag)
     }
 }
 
+static JSContext *qts_dbg_dup(JSContext *ctx, const char *tag)
+{
+    JSContext *r = JS_DupContext(ctx);
+    printf("[ctx] dup  %-9s ctx=%p rc=%d\n", tag, (void *)ctx, ctx->header.ref_count);
+    return r;
+}
+
 JSContext *JS_DupContext(JSContext *ctx)
 {
     ctx->header.ref_count++;
@@ -2339,9 +2348,11 @@ void JS_FreeContext(JSContext *ctx)
     JSRuntime *rt = ctx->rt;
     int i;
 
+    printf("[ctx] free ctx=%p rc=%d -> %d\n", (void *)ctx, ctx->header.ref_count, ctx->header.ref_count - 1);
     if (--ctx->header.ref_count > 0)
         return;
     assert(ctx->header.ref_count == 0);
+    printf("[ctx] FREED ctx=%p\n", (void *)ctx);
 
 #ifdef DUMP_ATOMS
     JS_DumpAtoms(ctx->rt);
@@ -5542,7 +5553,7 @@ static JSValue JS_NewCFunction3(JSContext *ctx, JSCFunction *func,
     if (JS_IsException(func_obj))
         return func_obj;
     p = JS_VALUE_GET_OBJ(func_obj);
-    p->u.cfunc.realm = JS_DupContext(ctx);
+    p->u.cfunc.realm = qts_dbg_dup(ctx, "cfunc");
     p->u.cfunc.c_function.generic = func;
     p->u.cfunc.length = length;
     p->u.cfunc.cproto = cproto;
@@ -10246,7 +10257,7 @@ static int JS_DefineAutoInitProperty(JSContext *ctx, JSValueConst this_obj,
     pr = add_property(ctx, p, prop, (flags & JS_PROP_C_W_E) | JS_PROP_AUTOINIT);
     if (unlikely(!pr))
         return -1;
-    pr->u.init.realm_and_id = (uintptr_t)JS_DupContext(ctx);
+    pr->u.init.realm_and_id = (uintptr_t)qts_dbg_dup(ctx, "autoinit");
     assert((pr->u.init.realm_and_id & 3) == 0);
     assert(id <= 3);
     pr->u.init.realm_and_id |= id;
@@ -35659,7 +35670,7 @@ static JSValue js_create_function(JSContext *ctx, JSFunctionDef *fd)
     b->arguments_allowed = fd->arguments_allowed;
     b->is_direct_or_indirect_eval = (fd->eval_type == JS_EVAL_TYPE_DIRECT ||
                                      fd->eval_type == JS_EVAL_TYPE_INDIRECT);
-    b->realm = JS_DupContext(ctx);
+    b->realm = qts_dbg_dup(ctx, "bcode-a");
 
     add_gc_object(ctx->rt, &b->header, JS_GC_OBJ_TYPE_FUNCTION_BYTECODE);
 
@@ -38333,7 +38344,7 @@ static JSValue JS_ReadFunctionTag(BCReaderState *s)
         }
         bc_read_trace(s, "}\n");
     }
-    b->realm = JS_DupContext(ctx);
+    b->realm = qts_dbg_dup(ctx, "bcode-b");
     return obj;
  fail:
     JS_FreeValue(ctx, obj);
@@ -59427,7 +59438,7 @@ static JSValue js_finrec_constructor(JSContext *ctx, JSValueConst new_target,
     frd->weakref_header.weakref_type = JS_WEAKREF_TYPE_FINREC;
     list_add_tail(&frd->weakref_header.link, &ctx->rt->weakref_list);
     init_list_head(&frd->entries);
-    frd->realm = JS_DupContext(ctx);
+    frd->realm = qts_dbg_dup(ctx, "finreg");
     frd->cb = JS_DupValue(ctx, cb);
     JS_SetOpaque(obj, frd);
     return obj;
